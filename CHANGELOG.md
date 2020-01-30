@@ -4,13 +4,47 @@ _All notable changes to this project will be documented in this file. This proje
 
 <!-- INSERT HERE -->
 
+## [0.17.1](https://github.com/uber/nebula.gl/compare/v0.17.0...v0.17.1) - 2020-01-16
+
+### Changes
+
+* Use mjolnir.js for event handling (#319)
+* Bump handlebars from 4.1.2 to 4.7.2 (#321)
+* Fix edit handle icons (#318)
+* Cleanup EditMode adapters (#316)
+
+### Breaking changes
+* Call `event.cancelPan()` instead of `event.sourceEvent.stopPropagation()` in custom edit modes
+* `PointerMoveEvent` no longer has an `isDragging` flag. Instead, use the new `handleDragging` event.
+
+## [0.17.0](https://github.com/uber/nebula.gl/compare/v0.16.0...v0.17.0) - 2020-01-10
+
+### Changes
+
+* Fix deck 8 (#317)
+* Rename DrawCircleByBoundingBoxMode to DrawCircleByDiameterMode (#314)
+* upgrade deckgl to 8.0 using upgrade script
+* update ocular-gatsby
+* Measure distance mode + tooltips (#299)
+* Use deck.gl mesh layer, update example to use it (#296)
+* Fix register events and respect selectedFeatureIndex passed from… (#287)
+* Update readme example
+
+### Breaking changes
+
+* DrawCircleByBoundingBoxMode renamed to DrawCircleByDiameterMode (#314)
+* The following props of `EditableGeoJsonLayer` are no longer proxied by nebula.gl (instead use deck.gl's [_subLayerProps](https://deck.gl/#/documentation/deckgl-api-reference/layers/composite-layer?section=_sublayerprops-object-experimental)):
+  * `getLineDashArray`
+  * `lineDashJustified`
+  * `getTentativeLineDashArray`
+
 ## [0.16.0](https://github.com/uber/nebula.gl/compare/v0.15.0...v0.16.0) - 2019-09-25
 
 ### Changes
 
 * You can now style edit handles with an outline (which is now also the default) by supplying `getEditHandlePointOutlineColor`
 * Swap EditableGeoJsonLayer to use edit-modes module (#283)
-* Unwrap guide object when using `_sublayerProps` (#284)
+* Unwrap guide object when using `_subLayerProps` (#284)
 * Remove deprecated usage. #281 (#282)
 
 ### Breaking changes for `EditableGeoJsonLayer`

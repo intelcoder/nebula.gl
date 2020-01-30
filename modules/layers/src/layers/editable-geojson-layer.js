@@ -1,7 +1,7 @@
 // @flow
 /* eslint-env browser */
 
-import { GeoJsonLayer, ScatterplotLayer, IconLayer } from '@deck.gl/layers';
+import { GeoJsonLayer, ScatterplotLayer, IconLayer, TextLayer } from '@deck.gl/layers';
 
 import {
   ViewMode,
@@ -18,7 +18,7 @@ import {
   DrawPolygonMode,
   DrawRectangleMode,
   DrawCircleFromCenterMode,
-  DrawCircleByBoundingBoxMode,
+  DrawCircleByDiameterMode,
   DrawEllipseByBoundingBoxMode,
   DrawRectangleUsingThreePointsMode,
   DrawEllipseUsingThreePointsMode,
@@ -31,6 +31,7 @@ import type {
   ClickEvent,
   StartDraggingEvent,
   StopDraggingEvent,
+  DraggingEvent,
   PointerMoveEvent,
   GeoJsonEditMode,
   FeatureCollection
@@ -52,7 +53,7 @@ const DEFAULT_EDITING_SNAP_POINT_RADIUS = 7;
 const DEFAULT_EDIT_MODE = DrawPolygonMode;
 
 function guideAccessor(accessor) {
-  if (!accessor) {
+  if (!accessor || typeof accessor !== 'function') {
     return accessor;
   }
   return guideMaybeWrapped => accessor(unwrapGuide(guideMaybeWrapped));
@@ -73,7 +74,7 @@ function getEditHandleColor(handle) {
   switch (handle.properties.editHandleType) {
     case 'existing':
       return DEFAULT_EDITING_EXISTING_POINT_COLOR;
-    case 'snap':
+    case 'snap-source':
       return DEFAULT_EDITING_SNAP_POINT_COLOR;
     case 'intermediate':
     default:
@@ -118,7 +119,6 @@ const defaultProps = {
   pointRadiusScale: 1,
   pointRadiusMinPixels: 2,
   pointRadiusMaxPixels: Number.MAX_SAFE_INTEGER,
-  lineDashJustified: false,
   getLineColor: (feature, isSelected, mode) =>
     isSelected ? DEFAULT_SELECTED_LINE_COLOR : DEFAULT_LINE_COLOR,
   getFillColor: (feature, isSelected, mode) =>
@@ -126,11 +126,8 @@ const defaultProps = {
   getRadius: f =>
     (f && f.properties && f.properties.radius) || (f && f.properties && f.properties.size) || 1,
   getLineWidth: f => (f && f.properties && f.properties.lineWidth) || 3,
-  getLineDashArray: (feature, isSelected, mode) =>
-    isSelected && mode !== 'view' ? [7, 4] : [0, 0],
 
   // Tentative feature rendering
-  getTentativeLineDashArray: (f, mode) => [7, 4],
   getTentativeLineColor: f => DEFAULT_SELECTED_LINE_COLOR,
   getTentativeFillColor: f => DEFAULT_SELECTED_FILL_COLOR,
   getTentativeLineWidth: f => (f && f.properties && f.properties.lineWidth) || 3,
@@ -181,7 +178,7 @@ const modeNameMapping = {
   drawPolygon: DrawPolygonMode,
   drawRectangle: DrawRectangleMode,
   drawCircleFromCenter: DrawCircleFromCenterMode,
-  drawCircleByBoundingBox: DrawCircleByBoundingBoxMode,
+  drawCircleByBoundingBox: DrawCircleByDiameterMode,
   drawEllipseByBoundingBox: DrawEllipseByBoundingBoxMode,
   drawRectangleUsing3Points: DrawRectangleUsingThreePointsMode,
   drawEllipseUsing3Points: DrawEllipseUsingThreePointsMode,
@@ -225,12 +222,10 @@ export default class EditableGeoJsonLayer extends EditableLayer {
       pointRadiusScale: this.props.pointRadiusScale,
       pointRadiusMinPixels: this.props.pointRadiusMinPixels,
       pointRadiusMaxPixels: this.props.pointRadiusMaxPixels,
-      lineDashJustified: this.props.lineDashJustified,
       getLineColor: this.selectionAwareAccessor(this.props.getLineColor),
       getFillColor: this.selectionAwareAccessor(this.props.getFillColor),
       getRadius: this.selectionAwareAccessor(this.props.getRadius),
       getLineWidth: this.selectionAwareAccessor(this.props.getLineWidth),
-      getLineDashArray: this.selectionAwareAccessor(this.props.getLineDashArray),
 
       _subLayerProps: {
         'line-strings': {
@@ -245,14 +240,13 @@ export default class EditableGeoJsonLayer extends EditableLayer {
         getLineColor: [this.props.selectedFeatureIndexes, this.props.mode],
         getFillColor: [this.props.selectedFeatureIndexes, this.props.mode],
         getRadius: [this.props.selectedFeatureIndexes, this.props.mode],
-        getLineWidth: [this.props.selectedFeatureIndexes, this.props.mode],
-        getLineDashArray: [this.props.selectedFeatureIndexes, this.props.mode]
+        getLineWidth: [this.props.selectedFeatureIndexes, this.props.mode]
       }
     });
 
     let layers: any = [new GeoJsonLayer(subLayerProps)];
 
-    layers = layers.concat(this.createGuidesLayers());
+    layers = layers.concat(this.createGuidesLayers(), this.createTooltipsLayers());
 
     return layers;
   }
@@ -420,8 +414,21 @@ export default class EditableGeoJsonLayer extends EditableLayer {
         lineMiterLimit: this.props.lineMiterLimit,
         getLineColor: guideAccessor(this.props.getTentativeLineColor),
         getLineWidth: guideAccessor(this.props.getTentativeLineWidth),
-        getFillColor: guideAccessor(this.props.getTentativeFillColor),
-        getLineDashArray: guideAccessor(this.props.getTentativeLineDashArray)
+        getFillColor: guideAccessor(this.props.getTentativeFillColor)
+      })
+    );
+
+    return [layer];
+  }
+
+  createTooltipsLayers() {
+    const mode = this.getActiveMode();
+    const tooltips = mode.getTooltips(this.getModeProps(this.props));
+
+    const layer = new TextLayer(
+      this.getSubLayerProps({
+        id: `tooltips`,
+        data: tooltips
       })
     );
 
@@ -436,6 +443,10 @@ export default class EditableGeoJsonLayer extends EditableLayer {
     this.getActiveMode().handleStartDragging(event, this.getModeProps(this.props));
   }
 
+  onDragging(event: DraggingEvent) {
+    this.getActiveMode().handleDragging(event, this.getModeProps(this.props));
+  }
+
   onStopDragging(event: StopDraggingEvent) {
     this.getActiveMode().handleStopDragging(event, this.getModeProps(this.props));
   }
@@ -448,6 +459,7 @@ export default class EditableGeoJsonLayer extends EditableLayer {
   getCursor({ isDragging }: { isDragging: boolean }) {
     let { cursor } = this.state;
     if (!cursor) {
+      // default cursor
       cursor = isDragging ? 'grabbing' : 'grab';
     }
     return cursor;

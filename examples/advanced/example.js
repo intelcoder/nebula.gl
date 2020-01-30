@@ -25,16 +25,19 @@ import {
   DrawLineStringMode,
   DrawPolygonMode,
   DrawRectangleMode,
-  DrawCircleByBoundingBoxMode,
+  DrawCircleByDiameterMode,
   DrawCircleFromCenterMode,
   DrawEllipseByBoundingBoxMode,
   DrawEllipseUsingThreePointsMode,
   DrawRectangleUsingThreePointsMode,
   Draw90DegreePolygonMode,
+  MeasureDistanceMode,
+  MeasureAreaMode,
   ViewMode,
   CompositeMode,
   SnappableMode,
   ElevatedEditHandleLayer,
+  PathMarkerLayer,
   SELECTION_TYPE
 } from 'nebula.gl';
 
@@ -77,7 +80,26 @@ const initialViewport = {
 const ALL_MODES = [
   {
     category: 'View',
-    modes: [{ label: 'View', mode: ViewMode }]
+    modes: [
+      { label: 'View', mode: ViewMode },
+      { label: 'Measure Distance', mode: MeasureDistanceMode },
+      { label: 'Measure Area', mode: MeasureAreaMode }
+    ]
+  },
+  {
+    category: 'Draw',
+    modes: [
+      { label: 'Draw Point', mode: DrawPointMode },
+      { label: 'Draw LineString', mode: DrawLineStringMode },
+      { label: 'Draw Polygon', mode: DrawPolygonMode },
+      { label: 'Draw 90° Polygon', mode: Draw90DegreePolygonMode },
+      { label: 'Draw Rectangle', mode: DrawRectangleMode },
+      { label: 'Draw Rectangle Using 3 Points', mode: DrawRectangleUsingThreePointsMode },
+      { label: 'Draw Circle From Center', mode: DrawCircleFromCenterMode },
+      { label: 'Draw Circle By Diameter', mode: DrawCircleByDiameterMode },
+      { label: 'Draw Ellipse By Bounding Box', mode: DrawEllipseByBoundingBoxMode },
+      { label: 'Draw Ellipse Using 3 Points', mode: DrawEllipseUsingThreePointsMode }
+    ]
   },
   {
     category: 'Alter',
@@ -93,21 +115,6 @@ const ALL_MODES = [
     ]
   },
   {
-    category: 'Draw',
-    modes: [
-      { label: 'Draw Point', mode: DrawPointMode },
-      { label: 'Draw LineString', mode: DrawLineStringMode },
-      { label: 'Draw Polygon', mode: DrawPolygonMode },
-      { label: 'Draw 90° Polygon', mode: Draw90DegreePolygonMode },
-      { label: 'Draw Rectangle', mode: DrawRectangleMode },
-      { label: 'Draw Rectangle Using 3 Points', mode: DrawRectangleUsingThreePointsMode },
-      { label: 'Draw Circle From Center', mode: DrawCircleFromCenterMode },
-      { label: 'Draw Circle By Diameter', mode: DrawCircleByBoundingBoxMode },
-      { label: 'Draw Ellipse By Bounding Box', mode: DrawEllipseByBoundingBoxMode },
-      { label: 'Draw Ellipse Using 3 Points', mode: DrawEllipseUsingThreePointsMode }
-    ]
-  },
-  {
     category: 'Composite',
     modes: [{ label: 'Draw LineString + Modify', mode: COMPOSITE_MODE }]
   }
@@ -119,9 +126,16 @@ const POLYGON_DRAWING_MODES = [
   DrawRectangleMode,
   DrawRectangleUsingThreePointsMode,
   DrawCircleFromCenterMode,
-  DrawCircleByBoundingBoxMode,
+  DrawCircleByDiameterMode,
   DrawEllipseByBoundingBoxMode,
   DrawEllipseUsingThreePointsMode
+];
+
+const TWO_CLICK_POLYGON_MODES = [
+  DrawRectangleMode,
+  DrawCircleFromCenterMode,
+  DrawCircleByDiameterMode,
+  DrawEllipseByBoundingBoxMode
 ];
 
 const EMPTY_FEATURE_COLLECTION = {
@@ -167,7 +181,7 @@ function getEditHandleColor(handle: {}) {
   switch (getEditHandleTypeFromEitherLayer(handle)) {
     case 'existing':
       return [0xff, 0x80, 0x00, 0xff];
-    case 'snap':
+    case 'snap-source':
       return [0xc0, 0x80, 0xf0, 0xff];
     case 'intermediate':
     default:
@@ -187,6 +201,7 @@ export default class Example extends Component<
     editHandleType: string,
     selectionTool: ?string,
     showGeoJson: boolean,
+    pathMarkerLayer: boolean,
     featureMenu: ?{
       index: number,
       x: number,
@@ -207,6 +222,7 @@ export default class Example extends Component<
       editHandleType: 'point',
       selectionTool: null,
       showGeoJson: false,
+      pathMarkerLayer: false,
       featureMenu: null
     };
   }
@@ -432,15 +448,41 @@ export default class Example extends Component<
               }
               onClick={() => {
                 if (this.state.modeConfig && this.state.modeConfig.booleanOperation === operation) {
-                  this.setState({ modeConfig: null });
+                  this.setState({
+                    modeConfig: { ...(this.state.modeConfig || {}), booleanOperation: null }
+                  });
                 } else {
-                  this.setState({ modeConfig: { booleanOperation: operation } });
+                  this.setState({
+                    modeConfig: { ...(this.state.modeConfig || {}), booleanOperation: operation }
+                  });
                 }
               }}
             >
               {operation}
             </ToolboxButton>
           ))}
+        </ToolboxControl>
+      </ToolboxRow>
+    );
+  }
+
+  _renderTwoClickPolygonControls() {
+    return (
+      <ToolboxRow key="twoClick">
+        <ToolboxTitle>Drag to draw</ToolboxTitle>
+        <ToolboxControl>
+          <input
+            type="checkbox"
+            checked={Boolean(this.state.modeConfig && this.state.modeConfig.dragToDraw)}
+            onChange={event =>
+              this.setState({
+                modeConfig: {
+                  ...(this.state.modeConfig || {}),
+                  dragToDraw: Boolean(event.target.checked)
+                }
+              })
+            }
+          />
         </ToolboxControl>
       </ToolboxRow>
     );
@@ -522,11 +564,40 @@ export default class Example extends Component<
     );
   }
 
+  _renderMeasureDistanceControls() {
+    return (
+      <ToolboxRow key="measure-distance">
+        <ToolboxTitle>Units</ToolboxTitle>
+        <ToolboxControl>
+          <select
+            value={
+              (this.state.modeConfig &&
+                this.state.modeConfig.turfOptions &&
+                this.state.modeConfig.turfOptions.units) ||
+              'kilometers'
+            }
+            onChange={event =>
+              this.setState({ modeConfig: { turfOptions: { units: event.target.value } } })
+            }
+          >
+            <option value="kilometers">kilometers</option>
+            <option value="miles">miles</option>
+            <option value="degrees">degrees</option>
+            <option value="radians">radians</option>
+          </select>
+        </ToolboxControl>
+      </ToolboxRow>
+    );
+  }
+
   _renderModeConfigControls() {
     const controls = [];
 
     if (POLYGON_DRAWING_MODES.indexOf(this.state.mode) > -1) {
       controls.push(this._renderBooleanOperationControls());
+    }
+    if (TWO_CLICK_POLYGON_MODES.indexOf(this.state.mode) > -1) {
+      controls.push(this._renderTwoClickPolygonControls());
     }
     if (this.state.mode === DrawLineStringMode) {
       controls.push(this._renderDrawLineStringModeControls());
@@ -539,6 +610,9 @@ export default class Example extends Component<
     }
     if (this.state.mode instanceof SnappableMode) {
       controls.push(this._renderSnappingControls());
+    }
+    if (this.state.mode === MeasureDistanceMode) {
+      controls.push(this._renderMeasureDistanceControls());
     }
 
     return controls;
@@ -631,6 +705,20 @@ export default class Example extends Component<
               }
             >
               Use ElevatedEditHandleLayer
+            </ToolboxCheckbox>
+          </ToolboxControl>
+
+          <ToolboxControl>
+            <ToolboxCheckbox
+              type="checkbox"
+              checked={this.state.pathMarkerLayer}
+              onChange={() =>
+                this.setState({
+                  pathMarkerLayer: !this.state.pathMarkerLayer
+                })
+              }
+            >
+              Use PathMarkerLayer
             </ToolboxCheckbox>
           </ToolboxControl>
         </ToolboxRow>
@@ -790,9 +878,14 @@ export default class Example extends Component<
     }
 
     // Demonstrate how to override sub layer properties
-    let _subLayerProps = null;
+    let _subLayerProps = {
+      tooltips: {
+        getColor: [255, 255, 255, 255]
+      }
+    };
+
     if (this.state.editHandleType === 'elevated') {
-      _subLayerProps = {
+      _subLayerProps = Object.assign(_subLayerProps, {
         guides: {
           _subLayerProps: {
             points: {
@@ -801,7 +894,21 @@ export default class Example extends Component<
             }
           }
         }
-      };
+      });
+    }
+
+    if (this.state.pathMarkerLayer) {
+      _subLayerProps = Object.assign(_subLayerProps, {
+        geojson: {
+          _subLayerProps: {
+            'line-strings': {
+              type: PathMarkerLayer,
+              getMarkerColor: x => [255, 255, 255, 255],
+              sizeScale: 1500
+            }
+          }
+        }
+      });
     }
 
     const editableGeoJsonLayer = new EditableGeoJsonLayer({
@@ -829,6 +936,20 @@ export default class Example extends Component<
         },
         existing: {
           x: 58,
+          y: 0,
+          width: 58,
+          height: 58,
+          mask: false
+        },
+        'snap-source': {
+          x: 58,
+          y: 0,
+          width: 58,
+          height: 58,
+          mask: false
+        },
+        'snap-target': {
+          x: 0,
           y: 0,
           width: 58,
           height: 58,
@@ -882,7 +1003,6 @@ export default class Example extends Component<
 
           getTentativeFillColor: () => [255, 0, 255, 100],
           getTentativeLineColor: () => [0, 0, 255, 255],
-          getTentativeLineDashArray: () => [0, 0],
           lineWidthMinPixels: 3
         })
       );

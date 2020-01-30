@@ -8,7 +8,8 @@ import type {
   ModeProps,
   PointerMoveEvent,
   StartDraggingEvent,
-  StopDraggingEvent
+  StopDraggingEvent,
+  DraggingEvent
 } from '../types.js';
 import { BaseGeoJsonEditMode, type GeoJsonEditAction } from './geojson-edit-mode.js';
 import { ImmutableFeatureCollection } from './immutable-feature-collection.js';
@@ -17,71 +18,53 @@ export class ScaleMode extends BaseGeoJsonEditMode {
   _isScalable: boolean;
   _geometryBeingScaled: ?FeatureCollection;
 
-  handlePointerMoveAdapter(
-    event: PointerMoveEvent,
-    props: ModeProps<FeatureCollection>
-  ): { editAction: ?GeoJsonEditAction, cancelMapPan: boolean } {
-    let editAction: ?GeoJsonEditAction = null;
-
-    this._isScalable =
-      Boolean(this._geometryBeingScaled) || this.isSelectionPicked(event.picks, props);
-
-    if (!this._isScalable || !event.pointerDownMapCoords) {
-      // Nothing to do
-      return { editAction: null, cancelMapPan: false };
-    }
-
-    if (event.isDragging && this._geometryBeingScaled) {
-      // Scale the geometry
-      editAction = this.getScaleAction(
-        event.pointerDownMapCoords,
-        event.mapCoords,
-        'scaling',
-        props
-      );
-    }
-
-    return { editAction, cancelMapPan: true };
-  }
-
-  handleStartDraggingAdapter(
-    event: StartDraggingEvent,
-    props: ModeProps<FeatureCollection>
-  ): ?GeoJsonEditAction {
+  handleDragging(event: DraggingEvent, props: ModeProps<FeatureCollection>) {
     if (!this._isScalable) {
-      return null;
+      // Nothing to do
+      return;
     }
-
-    this._geometryBeingScaled = this.getSelectedFeaturesAsFeatureCollection(props);
-    return null;
-  }
-
-  handleStopDraggingAdapter(
-    event: StopDraggingEvent,
-    props: ModeProps<FeatureCollection>
-  ): ?GeoJsonEditAction {
-    let editAction: ?GeoJsonEditAction = null;
 
     if (this._geometryBeingScaled) {
       // Scale the geometry
-      editAction = this.getScaleAction(
-        event.pointerDownMapCoords,
-        event.mapCoords,
-        'scaled',
-        props
+      props.onEdit(
+        this.getScaleAction(event.pointerDownMapCoords, event.mapCoords, 'scaling', props)
+      );
+    }
+
+    event.cancelPan();
+  }
+
+  handlePointerMove(event: PointerMoveEvent, props: ModeProps<FeatureCollection>) {
+    this._isScalable = this.isSelectionPicked(event.pointerDownPicks || event.picks, props);
+
+    this.updateCursor(props);
+  }
+
+  handleStartDragging(event: StartDraggingEvent, props: ModeProps<FeatureCollection>) {
+    if (!this._isScalable) {
+      return;
+    }
+
+    this._geometryBeingScaled = this.getSelectedFeaturesAsFeatureCollection(props);
+  }
+
+  handleStopDragging(event: StopDraggingEvent, props: ModeProps<FeatureCollection>) {
+    if (this._geometryBeingScaled) {
+      // Scale the geometry
+      props.onEdit(
+        this.getScaleAction(event.pointerDownMapCoords, event.mapCoords, 'scaled', props)
       );
       this._geometryBeingScaled = null;
     }
-
-    return editAction;
   }
 
-  getCursorAdapter(): ?string {
+  updateCursor(props: ModeProps<FeatureCollection>) {
     if (this._isScalable) {
       // TODO: look at doing SVG cursors to get a better "scale" cursor
-      return 'move';
+      props.onUpdateCursor('move');
+    } else {
+      props.onUpdateCursor(null);
     }
-    return null;
   }
 
   getScaleAction(

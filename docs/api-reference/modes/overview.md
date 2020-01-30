@@ -1,4 +1,4 @@
-# nebula.gl Editing Modes
+# Editing Modes
 
 `EditMode`s provide a way of handling user interactions in order to manipulate GeoJSON features and geometries.
 
@@ -91,6 +91,13 @@ User can draw a new `Polygon` feature with 90 degree corners (right angle) by cl
 
 User can draw a new rectangular `Polygon` feature by clicking two opposing corners of the rectangle.
 
+### ModeConfig
+
+The following options can be provided in the `modeConfig` object:
+
+* `dragToDraw` (optional):  `boolean`
+  * If `true`, user can click and drag instead of clicking twice. Note however, that the user will not be able to pan the map while drawing.
+
 ## [DrawRectangleUsingThreePointsMode](https://github.com/uber/nebula.gl/blob/master/modules/edit-modes/src/lib/draw-rectangle-using-three-points-mode.js)
 
 User can draw a new rectangular `Polygon` feature by clicking three corners of the rectangle.
@@ -105,10 +112,12 @@ The following options can be provided in the `modeConfig` object:
 
 * `steps` (optional):  `x <number>`
   * If steps: `x` means the circle will be drawn using `x` number of points.
+* `dragToDraw` (optional):  `boolean`
+  * If `true`, user can click and drag instead of clicking twice. Note however, that the user will not be able to pan the map while drawing.
 
-## [DrawCircleByBoundingBoxMode](https://github.com/uber/nebula.gl/blob/master/modules/edit-modes/src/lib/draw-circle-by-bounding-box-mode.js)
+## [DrawCircleByDiameterMode](https://github.com/uber/nebula.gl/blob/master/modules/edit-modes/src/lib/draw-circle-by-diameter-mode.js)
 
-User can draw a new circular `Polygon` feature by clicking the two corners of bounding box.
+User can draw a new circular `Polygon` feature by clicking the two ends of its diameter.
 
 ### ModeConfig
 
@@ -116,10 +125,19 @@ The following options can be provided in the `modeConfig` object:
 
 * `steps` (optional):  `x <number>`
   * If steps: `x` means the circle will be drawn using `x` number of points.
+* `dragToDraw` (optional):  `boolean`
+  * If `true`, user can click and drag instead of clicking twice. Note however, that the user will not be able to pan the map while drawing.
 
 ## [DrawEllipseByBoundingBoxMode](https://github.com/uber/nebula.gl/blob/master/modules/edit-modes/src/lib/draw-ellipse-by-bounding-box-mode.js)
 
 User can draw a new ellipse shape `Polygon` feature by clicking two corners of bounding box.
+
+### ModeConfig
+
+The following options can be provided in the `modeConfig` object:
+
+* `dragToDraw` (optional):  `boolean`
+  * If `true`, user can click and drag instead of clicking twice. Note however, that the user will not be able to pan the map while drawing.
 
 ## [DrawEllipseUsingThreePointsMode](https://github.com/uber/nebula.gl/blob/master/modules/edit-modes/src/lib/draw-ellipse-using-three-points-mode.js)
 
@@ -132,6 +150,42 @@ User can split a polygon by drawing a new `LineString` feature on top of the pol
 * If the first and the last click is outside the polygon, it will split the polygon
 
 * If the clicked position is inside the polygon, it will not split the polygon
+
+## [MeasureDistanceMode](https://github.com/uber/nebula.gl/blob/master/modules/edit-modes/src/lib/measure-distance-mode.js)
+
+User can measure a distance between two points.
+
+### ModeConfig
+
+The following options can be provided in the `modeConfig` object:
+
+* `turfOptions` (Object, optional)
+  * `options` object passed to turf's [distance](https://turfjs.org/docs/#distance) function
+  * Default: `undefined`
+
+* `formatTooltip` (Function, optional)
+  * Function to format tooltip text (argument is the numeric distance)
+  * Default: `(distance) => parseFloat(distance).toFixed(2) + units`
+
+* `measurementCallback` (Function, optional)
+  * Function to call as measurements are calculated
+  * Default: `undefined`
+
+## [MeasureAreaMode](https://github.com/uber/nebula.gl/blob/master/modules/edit-modes/src/lib/measure-area-mode.js)
+
+User can measure an area by drawing an arbitrary polygon.
+
+### ModeConfig
+
+The following options can be provided in the `modeConfig` object:
+
+* `formatTooltip` (Function, optional)
+  * Function to format tooltip text (argument is the numeric area)
+  * Default: `(distance) => parseFloat(distance).toFixed(2) + units`
+
+* `measurementCallback` (Function, optional)
+  * Function to call as measurements are calculated
+  * Default: `undefined`
 
 ## [ElevationMode](https://github.com/uber/nebula.gl/blob/master/modules/edit-modes/src/lib/elevation-mode.js)
 

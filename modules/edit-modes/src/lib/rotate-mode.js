@@ -7,6 +7,7 @@ import type {
   PointerMoveEvent,
   StartDraggingEvent,
   StopDraggingEvent,
+  DraggingEvent,
   ModeProps
 } from '../types.js';
 import type { FeatureCollection, Position } from '../geojson-types.js';
@@ -17,71 +18,54 @@ export class RotateMode extends BaseGeoJsonEditMode {
   _isRotatable: boolean;
   _geometryBeingRotated: ?FeatureCollection;
 
-  handlePointerMoveAdapter(
-    event: PointerMoveEvent,
-    props: ModeProps<FeatureCollection>
-  ): { editAction: ?GeoJsonEditAction, cancelMapPan: boolean } {
-    let editAction: ?GeoJsonEditAction = null;
-
-    this._isRotatable =
-      Boolean(this._geometryBeingRotated) || this.isSelectionPicked(event.picks, props);
-
-    if (!this._isRotatable || !event.pointerDownMapCoords) {
-      // Nothing to do
-      return { editAction: null, cancelMapPan: false };
-    }
-
-    if (event.isDragging && this._geometryBeingRotated) {
-      // Rotate the geometry
-      editAction = this.getRotateAction(
-        event.pointerDownMapCoords,
-        event.mapCoords,
-        'rotating',
-        props
-      );
-    }
-
-    return { editAction, cancelMapPan: true };
-  }
-
-  handleStartDraggingAdapter(
-    event: StartDraggingEvent,
-    props: ModeProps<FeatureCollection>
-  ): ?GeoJsonEditAction {
+  handleDragging(event: DraggingEvent, props: ModeProps<FeatureCollection>) {
     if (!this._isRotatable) {
-      return null;
+      // Nothing to do
+      return;
     }
-
-    this._geometryBeingRotated = this.getSelectedFeaturesAsFeatureCollection(props);
-    return null;
-  }
-
-  handleStopDraggingAdapter(
-    event: StopDraggingEvent,
-    props: ModeProps<FeatureCollection>
-  ): ?GeoJsonEditAction {
-    let editAction: ?GeoJsonEditAction = null;
 
     if (this._geometryBeingRotated) {
       // Rotate the geometry
-      editAction = this.getRotateAction(
-        event.pointerDownMapCoords,
-        event.mapCoords,
-        'rotated',
-        props
+      props.onEdit(
+        this.getRotateAction(event.pointerDownMapCoords, event.mapCoords, 'rotating', props)
+      );
+    }
+
+    // cancel map panning
+    event.cancelPan();
+  }
+
+  handlePointerMove(event: PointerMoveEvent, props: ModeProps<FeatureCollection>) {
+    this._isRotatable = this.isSelectionPicked(event.pointerDownPicks || event.picks, props);
+
+    this.updateCursor(props);
+  }
+
+  handleStartDragging(event: StartDraggingEvent, props: ModeProps<FeatureCollection>) {
+    if (!this._isRotatable) {
+      return;
+    }
+
+    this._geometryBeingRotated = this.getSelectedFeaturesAsFeatureCollection(props);
+  }
+
+  handleStopDragging(event: StopDraggingEvent, props: ModeProps<FeatureCollection>) {
+    if (this._geometryBeingRotated) {
+      // Rotate the geometry
+      props.onEdit(
+        this.getRotateAction(event.pointerDownMapCoords, event.mapCoords, 'rotated', props)
       );
       this._geometryBeingRotated = null;
     }
-
-    return editAction;
   }
 
-  getCursorAdapter(): ?string {
+  updateCursor(props: ModeProps<FeatureCollection>) {
     if (this._isRotatable) {
       // TODO: look at doing SVG cursors to get a better "rotate" cursor
-      return 'move';
+      props.onUpdateCursor('move');
+    } else {
+      props.onUpdateCursor(null);
     }
-    return null;
   }
 
   getRotateAction(

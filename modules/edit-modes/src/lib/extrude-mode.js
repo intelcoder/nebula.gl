@@ -1,207 +1,149 @@
 // @flow
 
 import bearing from '@turf/bearing';
-import { generatePointsParallelToLinePoints } from '../utils.js';
+import {
+  generatePointsParallelToLinePoints,
+  getPickedEditHandle,
+  getPickedIntermediateEditHandle
+} from '../utils.js';
 import type { FeatureCollection } from '../geojson-types.js';
-import type {
-  ModeProps,
-  PointerMoveEvent,
-  StartDraggingEvent,
-  StopDraggingEvent
-} from '../types.js';
-import { getPickedEditHandle, type GeoJsonEditAction } from './geojson-edit-mode.js';
+import type { ModeProps, StartDraggingEvent, StopDraggingEvent, DraggingEvent } from '../types.js';
 import { ModifyMode } from './modify-mode.js';
 import { ImmutableFeatureCollection } from './immutable-feature-collection.js';
 
 export class ExtrudeMode extends ModifyMode {
-  isPointAdded: boolean = false;
-  handlePointerMove(event: PointerMoveEvent, props: ModeProps<FeatureCollection>): void {
-    let editAction: ?GeoJsonEditAction = null;
+  // this mode is busted =(
 
+  isPointAdded: boolean = false;
+
+  handleDragging(event: DraggingEvent, props: ModeProps<FeatureCollection>): void {
     const editHandle = getPickedEditHandle(event.pointerDownPicks);
 
-    if (event.isDragging && editHandle) {
-      const size = this.coordinatesSize(
-        editHandle.positionIndexes,
-        editHandle.featureIndex,
-        props.data
-      );
-      const positionIndexes = this.isPointAdded
-        ? this.nextPositionIndexes(editHandle.positionIndexes, size)
-        : editHandle.positionIndexes;
+    if (editHandle) {
+      const { featureIndex } = editHandle.properties;
+      let { positionIndexes } = editHandle.properties;
+
+      const size = this.coordinatesSize(positionIndexes, featureIndex, props.data);
+      positionIndexes = this.isPointAdded
+        ? this.nextPositionIndexes(positionIndexes, size)
+        : positionIndexes;
       // p1 and p1 are end points for edge
       const p1 = this.getPointForPositionIndexes(
         this.prevPositionIndexes(positionIndexes, size),
-        editHandle.featureIndex,
+        featureIndex,
         props.data
       );
-      const p2 = this.getPointForPositionIndexes(
-        positionIndexes,
-        editHandle.featureIndex,
-        props.data
-      );
+      const p2 = this.getPointForPositionIndexes(positionIndexes, featureIndex, props.data);
       if (p1 && p2) {
         // p3 and p4 are end points for moving (extruding) edge
         const [p3, p4] = generatePointsParallelToLinePoints(p1, p2, event.mapCoords);
 
         const updatedData = new ImmutableFeatureCollection(props.data)
-          .replacePosition(
-            editHandle.featureIndex,
-            this.prevPositionIndexes(positionIndexes, size),
-            p4
-          )
-          .replacePosition(editHandle.featureIndex, positionIndexes, p3)
+          .replacePosition(featureIndex, this.prevPositionIndexes(positionIndexes, size), p4)
+          .replacePosition(featureIndex, positionIndexes, p3)
           .getObject();
 
-        editAction = {
+        props.onEdit({
           updatedData,
           editType: 'extruding',
           editContext: {
-            featureIndexes: [editHandle.featureIndex],
-            positionIndexes: this.nextPositionIndexes(editHandle.positionIndexes, size),
+            featureIndexes: [featureIndex],
+            positionIndexes: this.nextPositionIndexes(positionIndexes, size),
             position: p3
           }
-        };
+        });
 
-        props.onEdit(editAction);
+        event.cancelPan();
       }
-    }
-
-    const cursor = this.getCursor(event);
-    props.onUpdateCursor(cursor);
-
-    // Cancel map panning if pointer went down on an edit handle
-    const cancelMapPan = Boolean(editHandle);
-    if (cancelMapPan) {
-      event.sourceEvent.stopPropagation();
     }
   }
 
-  handleStartDraggingAdapter(
-    event: StartDraggingEvent,
-    props: ModeProps<FeatureCollection>
-  ): ?GeoJsonEditAction {
-    let editAction: ?GeoJsonEditAction = null;
-
+  handleStartDragging(event: StartDraggingEvent, props: ModeProps<FeatureCollection>) {
     const selectedFeatureIndexes = props.selectedIndexes;
 
-    const editHandle = getPickedEditHandle(event.picks);
-    if (selectedFeatureIndexes.length && editHandle && editHandle.type === 'intermediate') {
-      const size = this.coordinatesSize(
-        editHandle.positionIndexes,
-        editHandle.featureIndex,
-        props.data
-      );
+    const editHandle = getPickedIntermediateEditHandle(event.picks);
+    if (selectedFeatureIndexes.length && editHandle) {
+      const { positionIndexes, featureIndex } = editHandle.properties;
+
+      const size = this.coordinatesSize(positionIndexes, featureIndex, props.data);
       // p1 and p1 are end points for edge
       const p1 = this.getPointForPositionIndexes(
-        this.prevPositionIndexes(editHandle.positionIndexes, size),
-        editHandle.featureIndex,
+        this.prevPositionIndexes(positionIndexes, size),
+        featureIndex,
         props.data
       );
-      const p2 = this.getPointForPositionIndexes(
-        editHandle.positionIndexes,
-        editHandle.featureIndex,
-        props.data
-      );
+      const p2 = this.getPointForPositionIndexes(positionIndexes, featureIndex, props.data);
 
       if (p1 && p2) {
         let updatedData = new ImmutableFeatureCollection(props.data);
-        if (
-          !this.isOrthogonal(editHandle.positionIndexes, editHandle.featureIndex, size, props.data)
-        ) {
-          updatedData = updatedData.addPosition(
-            editHandle.featureIndex,
-            editHandle.positionIndexes,
-            p2
-          );
+        if (!this.isOrthogonal(positionIndexes, featureIndex, size, props.data)) {
+          updatedData = updatedData.addPosition(featureIndex, positionIndexes, p2);
         }
         if (
           !this.isOrthogonal(
-            this.prevPositionIndexes(editHandle.positionIndexes, size),
-            editHandle.featureIndex,
+            this.prevPositionIndexes(positionIndexes, size),
+            featureIndex,
             size,
             props.data
           )
         ) {
-          updatedData = updatedData.addPosition(
-            editHandle.featureIndex,
-            editHandle.positionIndexes,
-            p1
-          );
+          updatedData = updatedData.addPosition(featureIndex, positionIndexes, p1);
           this.isPointAdded = true;
         }
 
-        editAction = {
+        props.onEdit({
           updatedData: updatedData.getObject(),
           editType: 'startExtruding',
           editContext: {
-            featureIndexes: [editHandle.featureIndex],
-            positionIndexes: editHandle.positionIndexes,
+            featureIndexes: [featureIndex],
+            positionIndexes,
             position: p1
           }
-        };
+        });
       }
     }
-
-    return editAction;
   }
 
-  handleStopDraggingAdapter(
-    event: StopDraggingEvent,
-    props: ModeProps<FeatureCollection>
-  ): ?GeoJsonEditAction {
-    let editAction: ?GeoJsonEditAction = null;
-
+  handleStopDragging(event: StopDraggingEvent, props: ModeProps<FeatureCollection>) {
     const selectedFeatureIndexes = props.selectedIndexes;
-    const editHandle = getPickedEditHandle(event.picks);
+    const editHandle = getPickedEditHandle(event.pointerDownPicks);
     if (selectedFeatureIndexes.length && editHandle) {
-      const size = this.coordinatesSize(
-        editHandle.positionIndexes,
-        editHandle.featureIndex,
-        props.data
-      );
-      const positionIndexes = this.isPointAdded
-        ? this.nextPositionIndexes(editHandle.positionIndexes, size)
-        : editHandle.positionIndexes;
+      const { featureIndex } = editHandle.properties;
+      let { positionIndexes } = editHandle.properties;
+
+      const size = this.coordinatesSize(positionIndexes, featureIndex, props.data);
+      positionIndexes = this.isPointAdded
+        ? this.nextPositionIndexes(positionIndexes, size)
+        : positionIndexes;
       // p1 and p1 are end points for edge
       const p1 = this.getPointForPositionIndexes(
         this.prevPositionIndexes(positionIndexes, size),
-        editHandle.featureIndex,
+        featureIndex,
         props.data
       );
-      const p2 = this.getPointForPositionIndexes(
-        positionIndexes,
-        editHandle.featureIndex,
-        props.data
-      );
+      const p2 = this.getPointForPositionIndexes(positionIndexes, featureIndex, props.data);
 
       if (p1 && p2) {
         // p3 and p4 are end points for new moved (extruded) edge
         const [p3, p4] = generatePointsParallelToLinePoints(p1, p2, event.mapCoords);
 
         const updatedData = new ImmutableFeatureCollection(props.data)
-          .replacePosition(
-            editHandle.featureIndex,
-            this.prevPositionIndexes(positionIndexes, size),
-            p4
-          )
-          .replacePosition(editHandle.featureIndex, positionIndexes, p3)
+          .replacePosition(featureIndex, this.prevPositionIndexes(positionIndexes, size), p4)
+          .replacePosition(featureIndex, positionIndexes, p3)
           .getObject();
 
-        editAction = {
+        props.onEdit({
           updatedData,
           editType: 'extruded',
           editContext: {
-            featureIndexes: [editHandle.featureIndex],
-            positionIndexes: editHandle.positionIndexes,
+            featureIndexes: [featureIndex],
+            positionIndexes,
             position: p3
           }
-        };
+        });
       }
     }
     this.isPointAdded = false;
-
-    return editAction;
   }
 
   coordinatesSize(

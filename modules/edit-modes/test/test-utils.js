@@ -6,6 +6,7 @@ import type {
   ModeProps,
   ClickEvent,
   PointerMoveEvent,
+  StartDraggingEvent,
   StopDraggingEvent,
   Pick
 } from '../src/types.js';
@@ -258,7 +259,24 @@ export function createClickEvent(mapCoords: Position, picks: Pick[] = []): Click
   };
 }
 
-export function createPointerDragEvent(
+export function createStartDraggingEvent(
+  mapCoords: Position,
+  pointerDownMapCoords: Position,
+  picks: Pick[] = []
+): StartDraggingEvent {
+  return {
+    screenCoords: [-1, -1],
+    mapCoords,
+    picks,
+    pointerDownPicks: null,
+    pointerDownScreenCoords: [-1, -1],
+    pointerDownMapCoords,
+    cancelPan: jest.fn(),
+    sourceEvent: null
+  };
+}
+
+export function createStopDraggingEvent(
   mapCoords: Position,
   pointerDownMapCoords: Position,
   picks: Pick[] = []
@@ -267,7 +285,6 @@ export function createPointerDragEvent(
     screenCoords: [-1, -1],
     mapCoords,
     picks,
-    isDragging: true,
     pointerDownPicks: null,
     pointerDownScreenCoords: [-1, -1],
     pointerDownMapCoords,
@@ -280,10 +297,10 @@ export function createPointerMoveEvent(mapCoords: Position, picks: Pick[] = []):
     screenCoords: [-1, -1],
     mapCoords,
     picks,
-    isDragging: false,
     pointerDownPicks: null,
     pointerDownScreenCoords: null,
     pointerDownMapCoords: null,
+    cancelPan: jest.fn(),
     sourceEvent: null
   };
 }

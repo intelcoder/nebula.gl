@@ -17,7 +17,7 @@ export { DrawPointMode } from './lib/draw-point-mode.js';
 export { DrawLineStringMode } from './lib/draw-line-string-mode.js';
 export { DrawPolygonMode } from './lib/draw-polygon-mode.js';
 export { DrawRectangleMode } from './lib/draw-rectangle-mode.js';
-export { DrawCircleByBoundingBoxMode } from './lib/draw-circle-by-bounding-box-mode.js';
+export { DrawCircleByDiameterMode } from './lib/draw-circle-by-diameter-mode.js';
 export { DrawCircleFromCenterMode } from './lib/draw-circle-from-center-mode.js';
 export { DrawEllipseByBoundingBoxMode } from './lib/draw-ellipse-by-bounding-box-mode.js';
 export { DrawEllipseUsingThreePointsMode } from './lib/draw-ellipse-using-three-points-mode.js';
@@ -27,6 +27,8 @@ export { ImmutableFeatureCollection } from './lib/immutable-feature-collection.j
 
 // Other modes
 export { ViewMode } from './lib/view-mode.js';
+export { MeasureDistanceMode } from './lib/measure-distance-mode.js';
+export { MeasureAreaMode } from './lib/measure-area-mode.js';
 export { CompositeMode } from './lib/composite-mode.js';
 export { SnappableMode } from './lib/snappable-mode.js';
 
@@ -38,6 +40,8 @@ export type {
   PointerMoveEvent,
   StartDraggingEvent,
   StopDraggingEvent,
+  DraggingEvent,
+  DoubleClickEvent,
   ModeProps,
   Viewport
 } from './types.js';

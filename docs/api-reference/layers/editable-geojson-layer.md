@@ -65,7 +65,7 @@ _Note: passing a single `Feature` is not supported. However, you can pass a `Fea
 
 The `mode` property defines the mode used to handle user interaction events (e.g. pointer events) in order to accomplish edits. This can either be a constructor for an `EditMode` or an instance of `EditMode`.
 
-There are a extensive number of modes that come out-of-the-box with nebula.gl. See [modes overview](../modes/overview.md).
+There are a extensive number of modes that come out-of-the-box with nebula.gl. See [modes overview](/docs/api-reference/modes/overview.md).
 
 #### `modeConfig` (Object, optional)
 
@@ -248,11 +248,11 @@ Edit handle objects can be represented by either points or icons. `editHandlePoi
 
 #### `editHandlePointOutline` (Boolean, optional)
 
-* Default: `false`
+* Default: `true`
 
 #### `editHandlePointStrokeWidth` (Number, optional)
 
-* Default: `1`
+* Default: `2`
 
 #### `editHandlePointRadiusMinPixels` (Number, optional)
 
